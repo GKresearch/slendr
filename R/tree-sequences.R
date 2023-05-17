@@ -456,8 +456,14 @@ ts_simplify <- function(ts, simplify_to = NULL, keep_input_roots = FALSE,
     attr(ts_new, "nodes") <- data_new[, c(name_col, "pop", "node_id",
                                          "time", "time_tskit", location_col, "sampled", "remembered",
                                          "retained", "alive", "pedigree_id", "ind_id", "pop_id")]
-  } else
+  } else {
+    # mark only explicitly simplified individuals as "focal"
+    sample_ids <- data[data$node_id %in% samples, ]$ind_id
+    attr(ts_new, "raw_individuals")$sampled <-
+      attr(ts_new, "raw_individuals")$ind_id %in% sample_ids
+
     attr(ts_new, "nodes") <- get_tskit_table_data(ts_new, simplify_to)
+  }
 
   # replace the names of sampled individuals (if simplification led to subsetting)
   if (from_slendr) {
@@ -2553,7 +2559,9 @@ get_tskit_table_data <- function(ts, simplify_to = NULL) {
     if (!is.null(simplify_to))
       samples <- dplyr::filter(samples, name %in% simplify_to)
     samples <- dplyr::arrange(samples, -time, pop)
-    individuals <- dplyr::mutate(individuals, name = samples$name)
+    individuals <- individuals %>%
+      dplyr::filter(sampled) %>%
+      dplyr::mutate(name = samples$name)
   }
 
   # some tree sequence don't have any information about individuals -- for those cases,
